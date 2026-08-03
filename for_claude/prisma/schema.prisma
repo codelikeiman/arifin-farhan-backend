@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  roleId    Int      @map("role_id")
+  role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  examsCreated Exam[]        @relation("ExamCreator")
+  examAttempts ExamAttempt[]
+
+  @@map("users")
+}
+
+model Subject {
+  id    Int    @id @default(autoincrement())
+  name  String
+  exams Exam[]
+
+  @@map("subjects")
+}
+
+model Exam {
+  id              Int       @id @default(autoincrement())
+  title           String
+  subjectId       Int       @map("subject_id")
+  subject         Subject   @relation(fields: [subjectId], references: [id])
+  createdById     Int       @map("created_by")
+  createdBy       User      @relation("ExamCreator", fields: [createdById], references: [id])
+  durationMinutes Int       @map("duration_minutes")
+  isActive        Boolean   @default(true) @map("is_active")
+  startTime       DateTime? @map("start_time")
+  endTime         DateTime? @map("end_time")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  questions Question[]
+  attempts  ExamAttempt[]
+
+  @@map("exams")
+}
+
+model Question {
+  id           Int    @id @default(autoincrement())
+  examId       Int    @map("exam_id")
+  exam         Exam   @relation(fields: [examId], references: [id])
+  questionText String @map("question_text")
+
+  options        Option[]
+  studentAnswers StudentAnswer[]
+
+  @@map("questions")
+}
+
+model Option {
+  id         Int      @id @default(autoincrement())
+  questionId Int      @map("question_id")
+  question   Question @relation(fields: [questionId], references: [id])
+  optionText String   @map("option_text")
+  isCorrect  Boolean  @default(false) @map("is_correct")
+
+  studentAnswers StudentAnswer[]
+
+  @@map("options")
+}
+
+model ExamAttempt {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  user       User      @relation(fields: [userId], references: [id])
+  examId     Int       @map("exam_id")
+  exam       Exam      @relation(fields: [examId], references: [id])
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  score      Float?
+
+  studentAnswers StudentAnswer[]
+
+  @@unique([userId, examId]) // siswa hanya boleh mengerjakan satu kali
+  @@map("exam_attempts")
+}
+
+model StudentAnswer {
+  id            Int         @id @default(autoincrement())
+  examAttemptId Int         @map("exam_attempt_id")
+  examAttempt   ExamAttempt @relation(fields: [examAttemptId], references: [id])
+  questionId    Int         @map("question_id")
+  question      Question    @relation(fields: [questionId], references: [id])
+  optionId      Int?        @map("option_id")
+  option        Option?     @relation(fields: [optionId], references: [id])
+
+  @@unique([examAttemptId, questionId])
+  @@map("student_answers")
+}
