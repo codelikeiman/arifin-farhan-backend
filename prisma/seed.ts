@@ -154,11 +154,15 @@ async function main() {
       },
     });
 
-    for (const q of payload.questions) {
+    for (let idx = 0; idx < payload.questions.length; idx++) {
+      const q = payload.questions[idx];
+
+      // Question sekarang berdiri sendiri, terhubung ke Subject (bukan Exam langsung)
       const question = await prisma.question.create({
         data: {
-          examId: exam.id,
+          subjectId: subjects[payload.subjectName].id,
           questionText: q.text,
+          createdById: payload.createdById,
         },
       });
 
@@ -168,6 +172,15 @@ async function main() {
           optionText: o.text,
           isCorrect: o.isCorrect,
         })),
+      });
+
+      // Hubungkan Question ke Exam lewat tabel junction ExamQuestion
+      await prisma.examQuestion.create({
+        data: {
+          examId: exam.id,
+          questionId: question.id,
+          order: idx + 1,
+        },
       });
     }
 
@@ -338,12 +351,13 @@ async function main() {
     },
   });
 
-  // Ambil soal + opsi ujian matematika untuk diisi jawabannya
-  const mathQuestions = await prisma.question.findMany({
+  // Ambil soal + opsi ujian matematika lewat ExamQuestion (many-to-many)
+  const mathExamQuestions = await prisma.examQuestion.findMany({
     where: { examId: examMath.id },
-    include: { options: true },
-    orderBy: { id: 'asc' },
+    include: { question: { include: { options: true } } },
+    orderBy: { order: 'asc' },
   });
+  const mathQuestions = mathExamQuestions.map((eq) => eq.question);
 
   // Andi jawab benar semua kecuali soal terakhir (score 80 = 4/5 benar)
   for (let i = 0; i < mathQuestions.length; i++) {
@@ -381,11 +395,12 @@ async function main() {
     },
   });
 
-  const bindoQuestions = await prisma.question.findMany({
+  const bindoExamQuestions = await prisma.examQuestion.findMany({
     where: { examId: examBindo.id },
-    include: { options: true },
-    orderBy: { id: 'asc' },
+    include: { question: { include: { options: true } } },
+    orderBy: { order: 'asc' },
   });
+  const bindoQuestions = bindoExamQuestions.map((eq) => eq.question);
 
   for (const q of bindoQuestions) {
     const correctOption = q.options.find((o) => o.isCorrect)!;
